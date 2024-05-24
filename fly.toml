@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for pocket-litefs on 2024-05-23T22:14:13-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'pocket-litefs'
+primary_region = 'iad'
+
+[build]
+  # Uses Dockerfile by default
+
+[env]
+  PORT = '8080'
+
+[[mounts]]
+  source = 'litefs'
+  destination = '/var/lib/litefs'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256

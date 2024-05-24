@@ -1,0 +1,44 @@
+# Directory where placed SQLite files will be replicated. This is where Pocketbase should store its sqlite dbs
+fuse:
+  dir: "/litefs"
+
+# Internal litefs replication transactions and leader data.
+data:
+  dir: "/var/lib/litefs"
+
+# Keeps app alive making it easy to ssh in and debug in if there is a failure
+exit-on-error: false
+
+# Commands that LiteFS will run when the cluster starts
+exec:
+  # Serves the Pocketbase web app with its database in the LiteFS replication directory
+  - cmd: "/app/bin/pocketbase serve --dir /litefs --http=0.0.0.0:8081"
+
+# Fallover and leader negotiation is handled via Hashicorp Consul + Raft
+# See: https://fly.io/docs/litefs/getting-started-fly/
+lease:
+  type: "consul"
+  advertise-url: "http://${HOSTNAME}.vm.${FLY_APP_NAME}.internal:20202"
+  candidate: ${FLY_REGION == PRIMARY_REGION}
+  promote: true
+
+  consul:
+    # $FLY_CONSUL_URL is available only after running 'flytcl attach consul'
+    url: "${FLY_CONSUL_URL}"
+    key: "litefs/${FLY_APP_NAME}"
+
+# Replica databases have to redirect all write requests to the primary region database.
+# This proxy will do this for you. Reads will always happen from replica closest to user.
+proxy:
+  addr: ":8080" # <-- This is the port you should expose in Dockerfile and fly.toml
+  target: "localhost:8081" # <-- This is the pocket Pocketbase port is running on
+  db: "data.db" # <-- This is Pocktbase's main database.
+  debug: false
+
+  # List of paths that are ignored by the proxy.
+  passthrough: ["/debug/*", "*.png"]
+
+  # The duration to hold write requests when no primary is available.
+  # This is helpful when a primary switches over and there is a small window
+  # where the new primary is unknown to the replica.
+  primary-redirect-timeout: "5s"
